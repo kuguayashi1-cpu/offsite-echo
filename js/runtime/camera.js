@@ -1,4 +1,5 @@
 import { calculateGrayFromFrame, ROI_SIZE } from '../utils/gray.js';
+import { cameraHint, polyfillMediaDevices } from '../utils/env.js';
 
 export function CameraManager() {
   this.video = document.getElementById('cameraVideo');
@@ -98,12 +99,13 @@ CameraManager.prototype.start = function () {
 
 CameraManager.prototype._createCameraNow = function () {
   const self = this;
+  polyfillMediaDevices();
 
   if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
     this._starting = false;
     this._status('denied');
     if (this.onErrorCallback) {
-      this.onErrorCallback({ errMsg: '瀏覽器不支援攝像頭' });
+      this.onErrorCallback({ errMsg: '請用 Safari 打開此網頁' });
     }
     return;
   }
@@ -112,52 +114,65 @@ CameraManager.prototype._createCameraNow = function () {
     return navigator.mediaDevices.getUserMedia(constraints);
   };
 
-  tryGet({
-    audio: false,
-    video: {
-      facingMode: { ideal: 'environment' },
-      width: { ideal: 640 },
-      height: { ideal: 480 }
-    }
-  }).catch(function () {
-    return tryGet({ audio: false, video: true });
-  }).then(function (stream) {
+  const attempts = [
+    { audio: false, video: { facingMode: { ideal: 'environment' } } },
+    { audio: false, video: { facingMode: 'user' } },
+    { audio: false, video: true }
+  ];
+
+  let request = tryGet(attempts[0]);
+  let i;
+  for (i = 1; i < attempts.length; i++) {
+    (function (next) {
+      request = request.catch(function () {
+        return tryGet(next);
+      });
+    })(attempts[i]);
+  }
+
+  request.then(function (stream) {
     if (!self._starting && !self.listening) {
       stream.getTracks().forEach(function (t) { t.stop(); });
       return;
     }
     self.stream = stream;
-    self.video.srcObject = stream;
-    self.video.muted = true;
-    self.video.playsInline = true;
-    self.video.setAttribute('playsinline', 'true');
-    self.video.setAttribute('webkit-playsinline', 'true');
-    self.video.setAttribute('autoplay', 'true');
+    const v = self.video;
+    v.setAttribute('playsinline', 'true');
+    v.setAttribute('webkit-playsinline', 'true');
+    v.setAttribute('muted', '');
+    v.setAttribute('autoplay', 'true');
+    v.muted = true;
+    v.playsInline = true;
+    v.srcObject = stream;
 
     self._bindKeepAlive();
 
-    const playP = self.video.play();
+    const playP = v.play();
     if (playP && playP.catch) playP.catch(function () {});
 
     const onReady = function () {
-      self.video.removeEventListener('playing', onReady);
-      self.video.removeEventListener('loadeddata', onReady);
+      v.removeEventListener('playing', onReady);
+      v.removeEventListener('loadeddata', onReady);
       self.listening = true;
       self._startTick();
       self._fireReady();
     };
 
-    if (self.video.readyState >= 2 && self.video.videoWidth > 0) {
+    if (v.readyState >= 2 && v.videoWidth > 0) {
       onReady();
     } else {
-      self.video.addEventListener('playing', onReady);
-      self.video.addEventListener('loadeddata', onReady);
+      v.addEventListener('playing', onReady);
+      v.addEventListener('loadeddata', onReady);
+      setTimeout(function () {
+        if (!self._readyOnce && v.videoWidth > 0) onReady();
+      }, 800);
     }
   }).catch(function (err) {
     self._starting = false;
     self._status('denied');
-    const msg = (err && (err.message || err.name)) || 'camera denied';
-    if (self.onErrorCallback) self.onErrorCallback({ errMsg: String(msg) });
+    if (self.onErrorCallback) {
+      self.onErrorCallback({ errMsg: cameraHint(err) });
+    }
   });
 };
 

@@ -6,6 +6,7 @@ import { Music } from './runtime/music.js';
 import { CameraManager } from './runtime/camera.js';
 import { FrameView } from './runtime/frame_view.js';
 import { showToast } from './toast.js';
+import { isIOS, isInAppBrowser, cameraHint } from './utils/env.js';
 
 const HOLD_MS = 1100;
 const SCORE_LOCK = 90;
@@ -87,13 +88,16 @@ Main.prototype._bindTouch = function () {
   const self = this;
   this._lastHitAt = 0;
 
-  const onDown = function (e) {
+  const onUnlock = function () {
+    self.music.unlock();
+  };
+
+  const onHit = function (e) {
     self.music.unlock();
     if (self._touchLocked) return;
     const now = Date.now();
     if (now - self._lastHitAt < 350) return;
-    if (e.cancelable) e.preventDefault();
-    const p = self._canvasPoint(e.changedTouches ? e : e);
+    const p = self._canvasPoint(e);
     const hit = self.renderer.hitTest(p.x, p.y, self.databus.scene, self.databus.playState);
     if (!hit) return;
     self._lastHitAt = now;
@@ -111,9 +115,11 @@ Main.prototype._bindTouch = function () {
     }
   };
 
-  this.canvas.addEventListener('pointerdown', onDown);
-  this.canvas.addEventListener('touchend', onDown, { passive: false });
-  this.canvas.addEventListener('click', onDown);
+  this.canvas.addEventListener('touchstart', onUnlock, { passive: true });
+  this.canvas.addEventListener('click', onHit);
+  if (!isIOS()) {
+    this.canvas.addEventListener('pointerdown', onHit);
+  }
 };
 
 Main.prototype._bindCamera = function () {
@@ -160,9 +166,8 @@ Main.prototype._bindCamera = function () {
       if (self.databus.playState === 'playing') {
         self._endRound();
       }
-      let tip = (err && err.errMsg) ? String(err.errMsg) : '摄像头失败';
-      if (tip.length > 22) tip = tip.slice(0, 22);
-      showToast(tip, 2000);
+      const tip = (err && err.errMsg) || cameraHint(err);
+      showToast(tip, 2600);
     }
   });
 };
@@ -402,5 +407,10 @@ Main.prototype._loop = function () {
 };
 
 window.addEventListener('DOMContentLoaded', function () {
+  if (isInAppBrowser()) {
+    const hint = document.getElementById('safariHint');
+    if (hint) hint.hidden = false;
+    showToast('請用 Safari 打開才能開攝像頭', 2600);
+  }
   window.gameMain = new Main();
 });
