@@ -7,11 +7,10 @@ import { CameraManager } from './runtime/camera.js';
 import { FrameView } from './runtime/frame_view.js';
 import { showToast } from './toast.js';
 
-const ROUND_SECONDS = 60;
 const HOLD_MS = 1100;
+const SCORE_LOCK = 90;
+const SCORE_UNIT = 100;
 const COMBO_BREAK_MS = 650;
-const BASE_SCORE = 100;
-const COMBO_BONUS = 25;
 
 function Main() {
   this.canvas = document.getElementById('game');
@@ -218,9 +217,13 @@ Main.prototype.stopScan = function (opts) {
 };
 
 Main.prototype.backToRecordPage = function () {
-  this.databus.resetRound();
-  this.databus.scene = 'game';
-  showToast('录制页', 700);
+  const db = this.databus;
+  db.playState = 'idle';
+  db.matchPercent = 0;
+  db.justScored = 0;
+  db.setTarget(null);
+  db.scene = 'game';
+  showToast('已回扫描页', 800);
 };
 
 Main.prototype.backToStart = function () {
@@ -231,7 +234,11 @@ Main.prototype.backToStart = function () {
 
 Main.prototype.onTogglePlay = function () {
   const db = this.databus;
-  if (db.playState === 'playing') return;
+
+  if (db.playState === 'playing') {
+    this._endRound();
+    return;
+  }
 
   if (!db.isScanning || !db.cameraReady) {
     showToast('请先 START SCAN', 1400);
@@ -246,7 +253,7 @@ Main.prototype._startRound = function () {
   db.playState = 'playing';
   db.score = 0;
   db.combo = 0;
-  db.timeLeft = ROUND_SECONDS;
+  db.timeLeft = 0;
   db.roundHits = 0;
   db.matchPercent = 0;
   db.justScored = 0;
@@ -258,7 +265,7 @@ Main.prototype._startRound = function () {
   this._offTarget = 0;
   this._offStamp = 0;
   this._rollTarget();
-  showToast('对频开始 60 秒', 900);
+  showToast('PLAY 中 · 锁定90得100分', 1200);
 };
 
 Main.prototype._rollTarget = function () {
@@ -275,10 +282,11 @@ Main.prototype._endRound = function () {
   const db = this.databus;
   if (db.playState !== 'playing') return;
   db.playState = 'gameover';
-  db.timeLeft = 0;
+  db.timeLeft = Math.max(0, Math.floor((Date.now() - this._roundStart) / 1000));
   db.matchPercent = 0;
   db.isNewBest = db.saveBest();
-  db.targetLabel = 'TIME UP';
+  db.targetLabel = 'RESULT';
+  showToast('得分 ' + db.score, 1600);
 };
 
 Main.prototype.analyzeGray = function (grayValue) {
@@ -316,7 +324,7 @@ Main.prototype._updateMatch = function (now) {
     this._matchHold = now - this._matchStamp;
     db.matchPercent = Math.min(100, Math.round((this._matchHold / HOLD_MS) * 100));
 
-    if (this._matchHold >= HOLD_MS) {
+    if (db.matchPercent >= SCORE_LOCK) {
       this._scoreHit();
       this._matchStamp = 0;
     }
@@ -342,10 +350,9 @@ Main.prototype._scoreHit = function () {
   const db = this.databus;
   db.combo += 1;
   db.roundHits += 1;
-  const gain = BASE_SCORE + (db.combo - 1) * COMBO_BONUS;
-  db.score += gain;
-  db.lastGain = gain;
-  db.justScored = 45;
+  db.score += SCORE_UNIT;
+  db.lastGain = SCORE_UNIT;
+  db.justScored = 70;
   this._rollTarget();
 };
 
@@ -354,12 +361,7 @@ Main.prototype._tickGame = function () {
   if (db.justScored > 0) db.justScored -= 1;
 
   if (db.playState !== 'playing') return;
-
-  const elapsed = (Date.now() - this._roundStart) / 1000;
-  db.timeLeft = Math.max(0, Math.ceil(ROUND_SECONDS - elapsed));
-  if (db.timeLeft <= 0) {
-    this._endRound();
-  }
+  db.timeLeft = Math.max(0, Math.floor((Date.now() - this._roundStart) / 1000));
 };
 
 Main.prototype._loop = function () {

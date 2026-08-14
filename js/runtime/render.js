@@ -56,7 +56,7 @@ Renderer.prototype._computeGameLayout = function () {
   const contentW = W - pad * 2;
 
   const headerH = 56;
-  const hudH = 26;
+  const hudH = 32;
   const sensorH = 158;
   const btnH = 44;
   const backH = 32;
@@ -351,22 +351,22 @@ Renderer.prototype._drawHud = function (databus) {
     innerWidth: 1
   });
 
-  const combo = databus.combo > 1 ? ('  x' + databus.combo) : '';
+  const combo = databus.combo > 1 ? (' x' + databus.combo) : '';
   const scoreText = 'SCORE ' + this._padScore(databus.score) + combo;
-  const timeText = over ? 'TIME UP' : this._formatTime(databus.timeLeft);
+  const timeText = over ? 'RESULT' : (playing ? this._formatTime(databus.timeLeft) : 'READY');
   const bestText = 'BEST ' + this._padScore(databus.bestScore);
 
-  ui.drawPixelText(ctx, scoreText, h.x + 10, h.y + 8, {
-    size: 11, color: COLORS.MARIO_YELLOW, shadow: true
+  ui.drawPixelText(ctx, scoreText, h.x + 10, h.y + 6, {
+    size: 14, color: COLORS.MARIO_YELLOW, shadow: true
   });
-  ui.drawPixelText(ctx, timeText, h.x + h.w / 2, h.y + 8, {
-    size: 11,
-    color: (playing && databus.timeLeft <= 10) ? COLORS.NES_RED : COLORS.RETRO_GREEN,
+  ui.drawPixelText(ctx, timeText, h.x + h.w / 2, h.y + 6, {
+    size: 13,
+    color: playing ? COLORS.RETRO_GREEN : COLORS.PIXEL_GRAY,
     align: 'center',
     shadow: true
   });
-  ui.drawPixelText(ctx, bestText, h.x + h.w - 10, h.y + 8, {
-    size: 10, color: COLORS.PIXEL_GRAY, align: 'right', shadow: true
+  ui.drawPixelText(ctx, bestText, h.x + h.w - 10, h.y + 6, {
+    size: 11, color: COLORS.PIXEL_GRAY, align: 'right', shadow: true
   });
 };
 
@@ -451,11 +451,14 @@ Renderer.prototype._drawCameraViewportContent = function (databus) {
     ui.drawPixelText(ctx, 'TARGET ' + databus.targetLabel, cx, rect.y + 6, {
       size: 10, color: COLORS.MARIO_YELLOW, align: 'center', shadow: true
     });
+    ui.drawPixelText(ctx, 'SCORE ' + this._padScore(databus.score), cx, rect.y + 22, {
+      size: 14, color: COLORS.WHITE, align: 'center', shadow: true
+    });
   }
 
   if (databus.justScored > 0) {
-    ui.drawPixelText(ctx, '+' + databus.lastGain, cx, cy - roiSize / 2 - 16, {
-      size: 16, color: COLORS.MARIO_YELLOW, align: 'center', shadow: true
+    ui.drawPixelText(ctx, '+' + databus.lastGain, cx, cy - roiSize / 2 - 18, {
+      size: 22, color: COLORS.MARIO_YELLOW, align: 'center', shadow: true
     });
   }
 };
@@ -581,7 +584,7 @@ Renderer.prototype._drawSensorPanel = function (databus) {
   ctx.fillStyle = COLORS.PIXEL_GRAY;
   ctx.fillRect(s.x + 10, s.y + 122, s.w - 20, 2);
 
-  ui.drawPixelText(ctx, '对准目标灰度并锁定得分', s.x + 16, s.y + 128, {
+  ui.drawPixelText(ctx, '对准目标 · 锁定90即+100', s.x + 16, s.y + 128, {
     size: 9, color: COLORS.PIXEL_GRAY, shadow: true
   });
 };
@@ -592,10 +595,10 @@ Renderer.prototype._drawButtons = function (databus) {
   let playLabel = 'PLAY';
   let playActive = false;
   if (databus.playState === 'playing') {
-    playLabel = 'PLAYING';
+    playLabel = 'STOP';
     playActive = true;
   } else if (databus.playState === 'gameover') {
-    playLabel = 'RETRY';
+    playLabel = 'PLAY';
     playActive = true;
   }
 
@@ -634,30 +637,30 @@ Renderer.prototype._drawGameOver = function (databus) {
     innerWidth: 2
   });
 
-  ui.drawPixelText(ctx, 'TIME UP', W / 2, y + 18, {
-    size: 16, color: COLORS.NES_RED, align: 'center', shadow: true
+  ui.drawPixelText(ctx, 'FINAL SCORE', W / 2, y + 18, {
+    size: 16, color: COLORS.MARIO_YELLOW, align: 'center', shadow: true
   });
-  ui.drawPixelText(ctx, 'SCORE  ' + this._padScore(databus.score), W / 2, y + 50, {
-    size: 14, color: COLORS.MARIO_YELLOW, align: 'center', shadow: true
+  ui.drawPixelText(ctx, this._padScore(databus.score), W / 2, y + 48, {
+    size: 28, color: COLORS.WHITE, align: 'center', shadow: true
   });
-  ui.drawPixelText(ctx, 'HITS ' + databus.roundHits + '   BEST ' + this._padScore(databus.bestScore), W / 2, y + 76, {
-    size: 11, color: COLORS.WHITE, align: 'center', shadow: true
+  ui.drawPixelText(ctx, '+' + (databus.roundHits * 100) + '   HITS ' + databus.roundHits + '   BEST ' + this._padScore(databus.bestScore), W / 2, y + 84, {
+    size: 10, color: COLORS.PIXEL_GRAY, align: 'center', shadow: true
   });
 
   if (databus.isNewBest) {
-    ui.drawPixelText(ctx, 'NEW BEST', W / 2, y + 98, {
+    ui.drawPixelText(ctx, 'NEW BEST', W / 2, y + 104, {
       size: 12, color: COLORS.RETRO_GREEN, align: 'center', shadow: true
     });
   }
 
-  ui.drawPixelText(ctx, 'RETRY 再来 / BACK 录制页', W / 2, y + 128, {
+  ui.drawPixelText(ctx, 'PLAY 再来  /  BACK 扫描页', W / 2, y + 128, {
     size: 10, color: COLORS.PIXEL_GRAY, align: 'center', shadow: true
   });
 
   const btnY = y + 154;
   const btnW = Math.floor((boxW - 28) / 2);
   this.hitAreas.retryBtn = ui.drawPixelButton(
-    ctx, x + 8, btnY, btnW, 40, 'RETRY', { active: true, fontSize: 12 }
+    ctx, x + 8, btnY, btnW, 40, 'PLAY', { active: true, fontSize: 12 }
   );
   this.hitAreas.backScanBtn = ui.drawPixelButton(
     ctx, x + 20 + btnW, btnY, btnW, 40, 'BACK', { fontSize: 12 }
