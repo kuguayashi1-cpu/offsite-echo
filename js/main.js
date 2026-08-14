@@ -95,6 +95,10 @@ Main.prototype._bindTouch = function () {
       self.onToggleScan();
     } else if (hit === 'play') {
       self.onTogglePlay();
+    } else if (hit === 'back') {
+      self.backToStart();
+    } else if (hit === 'backScan') {
+      self.backToRecordPage();
     }
   };
 
@@ -118,11 +122,11 @@ Main.prototype._bindCamera = function () {
       self.analyzeGray(grayValue);
     },
     onReady: function () {
-      self.music.init();
       self.databus.cameraReady = true;
       self.databus.showCamera = true;
       self.databus.isScanning = true;
       self.databus.authStatus = 'granted';
+      self.music.startSession();
       self.databus.currentSound = 'SCANNING...';
       self.databus.currentSoundLabel = 'CAMERA OK';
       showToast('点 PLAY 开始对频', 1600);
@@ -172,23 +176,24 @@ Main.prototype.startScan = function () {
   const rect = this.renderer.getCameraNativeRect();
   this.camera.setLayout(rect.x, rect.y, rect.width, rect.height);
 
+  this.databus.resetRound();
   this.databus.currentSound = 'INITIALIZING...';
   this.databus.currentSoundLabel = 'TAP AUTH...';
   this.databus.authStatus = 'camera';
+
+  this.music.init();
+  this.music.unlock();
 
   const self = this;
   this._touchLocked = true;
   setTimeout(function () {
     self._touchLocked = false;
-  }, 1500);
+  }, 600);
 
   this.camera.start();
 };
 
-Main.prototype.stopScan = function () {
-  if (this.databus.playState === 'playing') {
-    this._endRound();
-  }
+Main.prototype.stopScan = function (opts) {
   this.databus.isScanning = false;
   this.databus.showCamera = false;
   this.databus.cameraReady = false;
@@ -202,9 +207,26 @@ Main.prototype.stopScan = function () {
   this.databus.roiGrayBuffer = null;
   this.databus.colorPreviewBuffer = null;
   this.databus.matchPercent = 0;
+  this.databus.resetRound();
   if (this.frameView) this.frameView.clear();
   this.camera.stop();
   this.music.stop();
+  if (!(opts && opts.silent)) {
+    this.databus.scene = 'game';
+    showToast('已返回录制页', 900);
+  }
+};
+
+Main.prototype.backToRecordPage = function () {
+  this.databus.resetRound();
+  this.databus.scene = 'game';
+  showToast('录制页', 700);
+};
+
+Main.prototype.backToStart = function () {
+  this.stopScan({ silent: true });
+  this.databus.scene = 'start';
+  showToast('场的回声', 700);
 };
 
 Main.prototype.onTogglePlay = function () {
@@ -347,6 +369,10 @@ Main.prototype._loop = function () {
   this.databus.frame += 1;
   this._tickGame();
   this.renderer.render(this.databus);
+  const live = this.databus.scene === 'game' && this.databus.isScanning;
+  const rect = this.renderer.getCameraNativeRect();
+  this.camera.setLayout(rect.x, rect.y, rect.width, rect.height);
+  this.camera.syncOverlay(this.canvas, live);
   this.aniId = requestAnimationFrame(function () {
     self._loop();
   });

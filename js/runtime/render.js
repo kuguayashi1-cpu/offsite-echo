@@ -59,16 +59,18 @@ Renderer.prototype._computeGameLayout = function () {
   const hudH = 26;
   const sensorH = 158;
   const btnH = 44;
+  const backH = 32;
   const gap = 6;
   const footerH = 14;
-  const reserved = headerH + hudH + sensorH + btnH + footerH + gap * 5 + 10;
+  const reserved = backH + headerH + hudH + sensorH + btnH + footerH + gap * 6 + 10;
   let cameraH = Math.max(132, H - reserved);
   cameraH = Math.min(cameraH, Math.floor(H * 0.34), 260);
 
-  const totalH = headerH + gap + hudH + gap + cameraH + gap + sensorH + gap + btnH + gap + footerH;
+  const totalH = backH + gap + headerH + gap + hudH + gap + cameraH + gap + sensorH + gap + btnH + gap + footerH;
   const startY = Math.max(8, Math.floor((H - totalH) / 2));
 
-  const headerY = startY;
+  const backY = startY;
+  const headerY = backY + backH + gap;
   const hudY = headerY + headerH + gap;
   const cameraY = hudY + hudH + gap;
   const sensorY = cameraY + cameraH + gap;
@@ -81,6 +83,7 @@ Renderer.prototype._computeGameLayout = function () {
     contentW: contentW,
     contentTop: startY,
     contentBottom: btnY + btnH,
+    backBtn: { x: pad, y: backY, w: 86, h: backH },
     header: { x: pad, y: headerY, w: contentW, h: headerH },
     hud: { x: pad, y: hudY, w: contentW, h: hudH },
     camera: { x: pad, y: cameraY, w: contentW, h: cameraH },
@@ -228,6 +231,7 @@ Renderer.prototype._renderGame = function (databus) {
   const ui = this.ui;
 
   this._drawCachedFactoryBackground(ctx);
+  this._drawBackButton(databus);
   this._drawHeader(databus);
   this._drawHud(databus);
   this._drawCameraPanel(databus);
@@ -285,6 +289,16 @@ Renderer.prototype._drawPageFactoryBackground = function (ctx) {
   } else {
     this.ui.drawMosaicBackground(ctx, this.width, this.height, 8);
   }
+};
+
+Renderer.prototype._drawBackButton = function (databus) {
+  const b = this.layout.backBtn;
+  if (!b) return;
+  this.hitAreas.backBtn = this.ui.drawPixelButton(
+    this.ctx, b.x, b.y, b.w, b.h,
+    '< BACK',
+    { fontSize: 11 }
+  );
 };
 
 Renderer.prototype._drawHeader = function (databus) {
@@ -410,16 +424,11 @@ Renderer.prototype._drawCameraViewportContent = function (databus) {
   let cx = rect.x + rect.width / 2;
   let cy = rect.y + rect.height / 2;
   const roiSize = 100;
-  let drawRect = null;
 
   ui.drawDarkGrid(ctx, rect.x, rect.y, rect.width, rect.height, 8);
 
   if (databus.isScanning && databus.cameraReady) {
-    drawRect = this._drawColorPreview(ctx, rect.x, rect.y, rect.width, rect.height);
-    if (drawRect) {
-      cx = drawRect.x + drawRect.width / 2;
-      cy = drawRect.y + drawRect.height / 2;
-    }
+    ctx.clearRect(rect.x, rect.y, rect.width, rect.height);
     const roiX = Math.round(cx - roiSize / 2);
     const roiY = Math.round(cy - roiSize / 2);
     this._drawROIGrayOverlay(ctx, databus, roiX, roiY, roiSize);
@@ -610,7 +619,7 @@ Renderer.prototype._drawGameOver = function (databus) {
   const W = this.width;
   const H = this.height;
   const boxW = Math.min(280, W - 40);
-  const boxH = 168;
+  const boxH = 210;
   const x = Math.floor((W - boxW) / 2);
   const y = Math.floor((H - boxH) / 2) - 20;
 
@@ -641,9 +650,18 @@ Renderer.prototype._drawGameOver = function (databus) {
     });
   }
 
-  ui.drawPixelText(ctx, 'TAP RETRY TO PLAY AGAIN', W / 2, y + 128, {
+  ui.drawPixelText(ctx, 'RETRY 再来 / BACK 录制页', W / 2, y + 128, {
     size: 10, color: COLORS.PIXEL_GRAY, align: 'center', shadow: true
   });
+
+  const btnY = y + 154;
+  const btnW = Math.floor((boxW - 28) / 2);
+  this.hitAreas.retryBtn = ui.drawPixelButton(
+    ctx, x + 8, btnY, btnW, 40, 'RETRY', { active: true, fontSize: 12 }
+  );
+  this.hitAreas.backScanBtn = ui.drawPixelButton(
+    ctx, x + 20 + btnW, btnY, btnW, 40, 'BACK', { fontSize: 12 }
+  );
 };
 
 Renderer.prototype.hitTest = function (px, py, scene, playState) {
@@ -652,8 +670,15 @@ Renderer.prototype.hitTest = function (px, py, scene, playState) {
     if (py > this.height * 0.7) return 'start';
     return null;
   }
+  if (playState === 'gameover') {
+    if (this.ui.hitTest(this.hitAreas.retryBtn, px, py)) return 'play';
+    if (this.ui.hitTest(this.hitAreas.backScanBtn, px, py)) return 'backScan';
+    if (this.ui.hitTest(this.hitAreas.playBtn, px, py)) return 'play';
+    if (this.ui.hitTest(this.hitAreas.backBtn, px, py)) return 'back';
+    return null;
+  }
+  if (this.ui.hitTest(this.hitAreas.backBtn, px, py)) return 'back';
   if (this.ui.hitTest(this.hitAreas.scanBtn, px, py)) return 'scan';
   if (this.ui.hitTest(this.hitAreas.playBtn, px, py)) return 'play';
-  if (playState === 'gameover' && py > this.height * 0.55) return 'play';
   return null;
 };

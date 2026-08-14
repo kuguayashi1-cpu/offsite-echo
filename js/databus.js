@@ -62,6 +62,21 @@ DataBus.prototype.reset = function () {
   this.isNewBest = false;
 };
 
+DataBus.prototype.resetRound = function () {
+  this.playState = 'idle';
+  this.score = 0;
+  this.combo = 0;
+  this.timeLeft = 60;
+  this.roundHits = 0;
+  this.targetLevel = -1;
+  this.targetName = '--';
+  this.targetLabel = 'PRESS PLAY';
+  this.matchPercent = 0;
+  this.justScored = 0;
+  this.lastGain = 0;
+  this.isNewBest = false;
+};
+
 DataBus.prototype.setGray = function (gray, frequency, note) {
   this.grayValue = gray;
   this.frequency = frequency;
