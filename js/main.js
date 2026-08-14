@@ -42,6 +42,10 @@ function Main() {
   this._bindTouch();
   this._bindCamera();
   this._bindResize();
+  const self = this;
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') self.music.unlock();
+  });
   this._loop();
 }
 
@@ -73,7 +77,7 @@ Main.prototype._bindAux = function () {
 
 Main.prototype._canvasPoint = function (e) {
   const rect = this.canvas.getBoundingClientRect();
-  const src = (e.touches && e.touches[0]) || e;
+  const src = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]) || e;
   const x = (src.clientX - rect.left) * (this.canvas.width / rect.width);
   const y = (src.clientY - rect.top) * (this.canvas.height / rect.height);
   return { x: x, y: y };
@@ -81,12 +85,18 @@ Main.prototype._canvasPoint = function (e) {
 
 Main.prototype._bindTouch = function () {
   const self = this;
+  this._lastHitAt = 0;
 
   const onDown = function (e) {
+    self.music.unlock();
     if (self._touchLocked) return;
+    const now = Date.now();
+    if (now - self._lastHitAt < 350) return;
     if (e.cancelable) e.preventDefault();
-    const p = self._canvasPoint(e);
+    const p = self._canvasPoint(e.changedTouches ? e : e);
     const hit = self.renderer.hitTest(p.x, p.y, self.databus.scene, self.databus.playState);
+    if (!hit) return;
+    self._lastHitAt = now;
 
     if (hit === 'start') {
       self.enterGame();
@@ -102,6 +112,8 @@ Main.prototype._bindTouch = function () {
   };
 
   this.canvas.addEventListener('pointerdown', onDown);
+  this.canvas.addEventListener('touchend', onDown, { passive: false });
+  this.canvas.addEventListener('click', onDown);
 };
 
 Main.prototype._bindCamera = function () {
@@ -125,10 +137,11 @@ Main.prototype._bindCamera = function () {
       self.databus.showCamera = true;
       self.databus.isScanning = true;
       self.databus.authStatus = 'granted';
+      self.music.unlock();
       self.music.startSession();
       self.databus.currentSound = 'SCANNING...';
       self.databus.currentSoundLabel = 'CAMERA OK';
-      showToast('点 PLAY 开始对频', 1600);
+      showToast('点一下画面开声音，再 PLAY', 1800);
     },
     onAuthStatus: function (status) {
       self.databus.authStatus = status;
@@ -155,6 +168,7 @@ Main.prototype._bindCamera = function () {
 };
 
 Main.prototype.enterGame = function () {
+  this.music.unlock();
   this.databus.scene = 'game';
   this.renderer.layout = this.renderer._computeGameLayout();
   showToast('场的回声', 800);
@@ -182,6 +196,9 @@ Main.prototype.startScan = function () {
 
   this.music.init();
   this.music.unlock();
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    showToast('iPhone请关闭静音拨片', 1400);
+  }
 
   const self = this;
   this._touchLocked = true;
@@ -233,7 +250,11 @@ Main.prototype.backToStart = function () {
 };
 
 Main.prototype.onTogglePlay = function () {
+  this.music.unlock();
   const db = this.databus;
+  if (db.isScanning && db.cameraReady) {
+    this.music.startSession();
+  }
 
   if (db.playState === 'playing') {
     this._endRound();
