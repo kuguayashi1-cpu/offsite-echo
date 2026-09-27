@@ -101,6 +101,7 @@ Renderer.prototype.resize = function (width, height) {
   this.canvas.height = height;
   this.layout = this._computeGameLayout();
   this._bgCache = null;
+  this._bgImageCached = false;
 };
 
 Renderer.prototype.getCameraNativeRect = function () {
