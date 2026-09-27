@@ -256,12 +256,19 @@ Renderer.prototype._renderGame = function (databus) {
 };
 
 Renderer.prototype._drawCachedFactoryBackground = function (ctx) {
-  if (this.factoryBg && this.factoryBg.ready && !this._bgImageCached) {
+  const factoryBgReady = this.factoryBg && this.factoryBg.ready;
+
+  if (factoryBgReady && !this._bgImageCached) {
     this._bgCache = null;
     this._bgImageCached = true;
   }
 
   if (!this._bgCache || this._bgCacheW !== this.width || this._bgCacheH !== this.height) {
+    if (!factoryBgReady) {
+      this._drawPageFactoryBackground(ctx);
+      return;
+    }
+
     try {
       this._bgCache = document.createElement('canvas');
       this._bgCache.width = this.width;
